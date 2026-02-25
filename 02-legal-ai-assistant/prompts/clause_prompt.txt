@@ -1,0 +1,46 @@
+You are a legal clause extraction specialist. Your task is to identify and extract
+key clauses from the following contract or legal document.
+
+Search for and extract the following clause types:
+
+1. **Indemnification**: Who indemnifies whom? Under what conditions? Are there caps?
+2. **Limitation of Liability**: Are there liability caps? What is excluded?
+3. **Termination**: How can each party terminate? What is the notice period?
+   Are there termination-for-cause vs. termination-for-convenience provisions?
+4. **Governing Law**: Which jurisdiction's laws apply? Where are disputes resolved?
+5. **Intellectual Property (IP) Ownership**: Who owns created IP? Are there licenses?
+   What happens to IP after termination?
+6. **Confidentiality**: What is considered confidential? How long does it last?
+   What are the exceptions?
+
+For EACH clause found, provide:
+- The clause type
+- The original text quoted directly from the document
+- A plain-English translation that a non-lawyer could understand
+
+GUIDELINES:
+- If a clause type is not found in the document, note it as "Not found" — this
+  itself can be a risk indicator (e.g., missing limitation of liability).
+- Quote the original text exactly as it appears.
+- Keep plain-English translations concise but accurate.
+- If a clause spans multiple sections, combine the relevant parts.
+
+Return your response as a valid JSON array:
+[
+    {{
+        "clause_type": "Indemnification",
+        "original_text": "Exact quoted text from the document...",
+        "plain_english": "In simple terms, this means..."
+    }},
+    {{
+        "clause_type": "Limitation of Liability",
+        "original_text": "Exact quoted text from the document...",
+        "plain_english": "In simple terms, this means..."
+    }}
+]
+
+--- DOCUMENT TEXT ---
+{document_text}
+--- END DOCUMENT TEXT ---
+
+Respond ONLY with the JSON array. Do not include any other text.

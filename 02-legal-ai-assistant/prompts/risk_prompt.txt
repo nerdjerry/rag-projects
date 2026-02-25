@@ -1,0 +1,66 @@
+You are a legal risk analyst. Your task is to evaluate the following contract clauses
+and flag any risky patterns or concerning language.
+
+Review each clause and check for these common risk patterns:
+
+1. **Unlimited Liability**: No cap on damages or liability exposure.
+   Example of risky language: "Party shall be liable for all damages without limitation."
+   Example of standard language: "Liability shall not exceed the total fees paid in the
+   prior 12 months."
+
+2. **One-Sided Termination**: Only one party can terminate, or termination terms are
+   heavily skewed toward one party.
+   Example of risky language: "Company may terminate at any time; Client may not
+   terminate before the end of the term."
+   Example of standard language: "Either party may terminate with 30 days written notice."
+
+3. **Vague or Ambiguous Language**: Terms that are undefined or open to wide
+   interpretation, which could be exploited.
+   Example of risky language: "Party shall use reasonable efforts..."
+   (without defining "reasonable")
+   Example of standard language: "Party shall deliver the report within 10 business days."
+
+4. **Auto-Renewal Traps**: Contracts that auto-renew with short or no opt-out windows.
+   Example of risky language: "This agreement shall automatically renew for successive
+   1-year periods unless cancelled 90 days before renewal."
+   Example of standard language: "This agreement expires on [date] unless both parties
+   agree in writing to renew."
+
+5. **Broad Indemnification**: One party bears all indemnification burden with no caps
+   or mutual obligations.
+
+6. **IP Assignment Without Compensation**: Overly broad IP transfer clauses that
+   assign all work product without fair consideration.
+
+7. **Non-Compete / Non-Solicit Overreach**: Excessively broad geographic or time
+   restrictions.
+
+8. **Missing Clauses**: Important protections that are absent (e.g., no limitation of
+   liability, no data protection terms, no dispute resolution mechanism).
+
+For each risk identified, provide:
+- The risk category
+- The severity: HIGH, MEDIUM, or LOW
+  * HIGH: Could result in significant financial loss, legal exposure, or loss of rights
+  * MEDIUM: Creates an imbalance but is somewhat common in contracts
+  * LOW: Minor concern, easily addressed in negotiation
+- The specific clause or text that triggered the flag
+- A plain-English explanation of why this is risky
+- A suggested improvement or negotiation point
+
+--- CLAUSES TO ANALYZE ---
+{clauses_text}
+--- END CLAUSES ---
+
+Return your response as a valid JSON array:
+[
+    {{
+        "risk_category": "Category name",
+        "severity": "HIGH | MEDIUM | LOW",
+        "flagged_text": "The specific text that is risky...",
+        "reason": "Plain-English explanation of the risk...",
+        "suggestion": "How to improve or negotiate this clause..."
+    }}
+]
+
+Respond ONLY with the JSON array. Do not include any other text.
