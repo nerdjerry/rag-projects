@@ -1,0 +1,52 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+*.pyo
+
+# Virtual environments
+venv/
+.venv/
+env/
+.env
+
+# Environment files (keep .env.example, ignore .env)
+.env
+!.env.example
+
+# FAISS indexes (generated at runtime)
+faiss_index/
+legal_faiss_index/
+papers_faiss_index/
+text_faiss_index/
+image_faiss_index/
+table_faiss_index/
+kb_faiss_index/
+*_faiss_index/
+
+# Generated reports
+research_report_*.md
+
+# Extracted content (generated at runtime)
+data/extracted/images/*.png
+data/extracted/images/*.jpg
+data/extracted/tables/*.csv
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# macOS
+.DS_Store
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
