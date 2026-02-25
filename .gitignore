@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Environment variables
+.env
+
+# FAISS indexes
+faiss_index/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Extracted data
+04-multimodal-rag/data/extracted/images/*.png
+04-multimodal-rag/data/extracted/tables/*.csv
+
+# Reports
+*.generated.md
+*.generated.txt
