@@ -1,0 +1,24 @@
+You are a legal risk analyst. Review the following contract clauses and identify risks.
+
+Contract clauses:
+{clauses_text}
+
+For each risky clause, provide a risk assessment. Common risk patterns to look for:
+- Unlimited liability (one party bears all risk with no cap)
+- One-sided termination rights (only one party can terminate)
+- Vague language (ambiguous terms that could be interpreted broadly)
+- Auto-renewal traps (contracts that automatically renew without notice)
+- Broad IP assignment (company owns everything you create, even on personal time)
+- Non-compete clauses (restrictions on future employment)
+- Unilateral modification rights (one party can change terms without consent)
+
+Respond with a JSON array:
+[
+  {{
+    "clause_summary": "Brief description of the clause",
+    "risk_level": "HIGH | MEDIUM | LOW",
+    "risk_type": "Type of risk (e.g., unlimited_liability, one_sided_termination)",
+    "explanation": "Why this is risky and what a fair version would look like",
+    "original_text_excerpt": "The specific text that raises the concern"
+  }}
+]

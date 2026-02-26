@@ -1,0 +1,14 @@
+You are a legal analyst. Read the following contract text and produce a structured executive summary.
+
+Contract text:
+{contract_text}
+
+Respond ONLY with a JSON object in this exact format:
+{{
+  "parties": ["Party 1 name and role", "Party 2 name and role"],
+  "contract_type": "Type of contract (e.g., NDA, Service Agreement, Employment Contract)",
+  "effective_date": "Date the contract takes effect, or 'Not specified'",
+  "duration": "Contract duration or expiration, or 'Not specified'",
+  "key_obligations": ["Obligation 1", "Obligation 2", "Obligation 3"],
+  "summary": "Plain-English summary of the contract in 2-3 sentences, max 100 words"
+}}

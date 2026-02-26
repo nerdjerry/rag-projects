@@ -1,0 +1,24 @@
+You are a legal analyst specializing in contract review. Extract specific clause types from the following contract text.
+
+Contract text:
+{contract_text}
+
+Identify and extract the following clause types if present:
+- indemnification: Who must protect whom from losses
+- limitation_of_liability: Caps on damages one party can claim
+- termination: Conditions under which the contract can be ended
+- governing_law: Which jurisdiction's laws govern the contract
+- ip_ownership: Who owns intellectual property created under the contract
+- confidentiality: Obligations to keep information secret
+
+For each clause found, respond with a JSON array:
+[
+  {{
+    "clause_type": "indemnification",
+    "original_text": "The exact text from the contract",
+    "plain_english": "What this means in simple terms",
+    "section_reference": "Section number if identifiable, else 'Unknown'"
+  }}
+]
+
+If a clause type is not found, omit it from the array.
