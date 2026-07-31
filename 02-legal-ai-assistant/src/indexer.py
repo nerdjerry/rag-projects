@@ -18,7 +18,7 @@ import os
 
 # HuggingFaceEmbeddings runs locally — no API key needed for embedding.
 # We default to "all-MiniLM-L6-v2" which is fast and good for semantic search.
-from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
 
 # RecursiveCharacterTextSplitter tries to split on paragraphs, then sentences,

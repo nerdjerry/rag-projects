@@ -66,7 +66,7 @@ PDF Document
 | Modality | Model | Why |
 |---|---|---|
 | Text | all-MiniLM-L6-v2 | Fast, free, runs locally, strong retrieval quality |
-| Images | GPT-4V (`gpt-4-vision-preview`) | Understands visual content — charts, diagrams, photos |
+| Images | GPT-4V (`gpt-4o-mini`) | Understands visual content — charts, diagrams, photos |
 | Tables | GPT-3.5 / GPT-4 | Strong at structured data reasoning; converts rows to prose |
 | Generation | GPT-4 | Best reasoning across mixed text / image / table context |
 
@@ -145,7 +145,7 @@ python main.py --file data/sample_docs/report.pdf \
 --file           Path to PDF document (required)
 --query          Question to answer
 --model          Text generation model (default: gpt-4)
---vision-model   Vision model for image captioning (default: gpt-4-vision-preview)
+--vision-model   Vision model for image captioning (default: gpt-4o-mini)
 --skip-images    Skip GPT-4V image captioning
 --skip-tables    Skip LLM table description generation
 --interactive    Interactive Q&A loop after indexing

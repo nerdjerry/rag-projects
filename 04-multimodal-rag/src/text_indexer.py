@@ -16,7 +16,7 @@ indexes in the multimodal pipeline.  The query router decides whether to
 hit this index, the image index, the table index, or all three.
 """
 
-from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
 from langchain.schema import Document
 

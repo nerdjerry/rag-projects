@@ -43,7 +43,7 @@
 # Cosine similarity is preferred over Euclidean distance because it's insensitive
 # to the magnitude of the vectors — only the direction matters.
 
-from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_huggingface import HuggingFaceEmbeddings
 
 
 def get_embedding_model(model_name: str = "all-MiniLM-L6-v2") -> HuggingFaceEmbeddings:

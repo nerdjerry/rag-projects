@@ -1,8 +1,8 @@
 """
 image_processor.py
 ------------------
-Converts image files into natural-language captions using GPT-4V (or any
-compatible OpenAI vision model), making images semantically searchable.
+Converts image files into natural-language captions using a vision-capable
+OpenAI model (e.g. gpt-4o-mini), making images semantically searchable.
 
 Why convert images to text captions?
 --------------------------------------
@@ -10,15 +10,17 @@ Semantic search engines (FAISS + sentence-transformers) operate in *text*
 embedding space.  A raw PNG file cannot be compared to a natural-language
 query like "architecture diagram of the data pipeline."
 
-By asking GPT-4V to *describe* an image in detail, we produce a text string
-that captures the visual content — labels, shapes, data, layout — in a form
-that a sentence-transformer can embed and a user query can match against.
+By asking a vision model to *describe* an image in detail, we produce a text
+string that captures the visual content — labels, shapes, data, layout — in a
+form that a sentence-transformer can embed and a user query can match against.
 
-How GPT-4V works
------------------
-GPT-4V (gpt-4-vision-preview) is a multimodal large language model that
-accepts *both* text and images in the same prompt.  Images are supplied as
-base64-encoded strings inside a message with role "user".
+How vision input works
+------------------------
+Current OpenAI chat models (gpt-4o, gpt-4o-mini, etc.) accept *both* text and
+images in the same prompt. Images are supplied as base64-encoded strings
+inside a message with role "user". (The earlier gpt-4-vision-preview model
+that pioneered this API has since been retired — any current chat model with
+vision support uses the same message format.)
 
 The base64 encoding pattern:
   1. Read the image file in binary mode.
@@ -28,7 +30,7 @@ The base64 encoding pattern:
 
 Cost consideration ⚠️
 ----------------------
-GPT-4V is significantly more expensive than text-only GPT models:
+Vision requests are more expensive than text-only calls:
   * A 1024×1024 image costs roughly 765 tokens at the "high" detail setting.
   * Caption all images once, then **cache** the results to avoid re-captioning
     on every run.  The main pipeline serialises captions to disk for this reason.
@@ -50,16 +52,17 @@ from PIL import Image
 def caption_image(
     image_path: str,
     openai_client,
-    vision_model: str = "gpt-4-vision-preview",
+    vision_model: str = "gpt-4o-mini",
 ) -> dict:
     """
-    Generate a detailed text caption for a single image using GPT-4V.
+    Generate a detailed text caption for a single image using a vision model.
 
     Parameters
     ----------
     image_path    : Path to the image file (PNG, JPEG, etc.).
     openai_client : An initialised openai.OpenAI() client instance.
-    vision_model  : OpenAI vision model identifier.
+    vision_model  : OpenAI vision-capable model identifier (must accept image
+                    inputs — e.g. "gpt-4o" or "gpt-4o-mini").
 
     Returns
     -------
@@ -108,10 +111,12 @@ def caption_image(
         image_type = _infer_image_type(caption)
 
     except Exception as exc:
-        # Graceful degradation: if GPT-4V is unavailable (quota, model access,
-        # or network issue) we return a placeholder so the pipeline keeps running.
-        # The placeholder still gets indexed; it just won't match queries well.
-        print(f"  [image_processor] GPT-4V unavailable for '{image_path}': {exc}")
+        # Graceful degradation: if the vision model is unavailable (quota, model
+        # access, or network issue) we return a placeholder so the pipeline keeps
+        # running. The placeholder still gets indexed; it just won't match queries
+        # well — process_all_images() surfaces a loud warning when this happens so
+        # the failure isn't silently mistaken for a working image-search feature.
+        print(f"  [image_processor] ⚠️  Vision model unavailable for '{image_path}': {exc}")
         caption = f"[Image caption unavailable — {image_path}]"
         image_type = "unknown"
 
@@ -125,7 +130,7 @@ def caption_image(
 def process_all_images(
     image_paths: list[str],
     openai_client,
-    vision_model: str = "gpt-4-vision-preview",
+    vision_model: str = "gpt-4o-mini",
 ) -> list[dict]:
     """
     Caption every image in the list and return combined results.
@@ -134,7 +139,7 @@ def process_all_images(
     ----------
     image_paths   : List of file paths returned by the multimodal parser.
     openai_client : An initialised openai.OpenAI() client instance.
-    vision_model  : OpenAI vision model identifier.
+    vision_model  : OpenAI vision-capable model identifier.
 
     Returns
     -------
@@ -148,6 +153,15 @@ def process_all_images(
         print(f"  [image_processor] Captioning image {idx}/{len(image_paths)}: {path}")
         result = caption_image(path, openai_client, vision_model)
         results.append(result)
+
+    failed = [r for r in results if r["image_type"] == "unknown"]
+    if failed:
+        print(
+            f"\n  [image_processor] ⚠️  WARNING: {len(failed)}/{len(results)} image(s) "
+            f"failed to caption and were indexed as placeholders — they will not "
+            f"match search queries. Check the vision model name and API access above."
+        )
+
     return results
 
 

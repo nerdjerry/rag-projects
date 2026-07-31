@@ -27,7 +27,7 @@ from pathlib import Path
 from langchain_community.document_loaders import (
     PyPDFLoader,      # Reads PDF files — returns one Document per page
     TextLoader,       # Reads plain .txt files — returns one Document per file
-    Docx2txtLoader,   # Reads .docx (Word) files — returns one Document per file
+    Docx2txtLoader,   # Reads .docx (Word) files — returns one Document per file (needs the docx2txt package)
 )
 
 

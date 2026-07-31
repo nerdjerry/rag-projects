@@ -269,7 +269,7 @@ def ask_question(qa_chain, question: str, debug: bool = False):
     Ask a single question and print the answer with source attribution.
 
     Args:
-        qa_chain:      The assembled RetrievalQA chain.
+        qa_chain:      The assembled retrieval chain (from generator.build_qa_chain).
         question (str): The question to ask.
         debug (bool):   If True, print source document details.
     """
@@ -280,13 +280,13 @@ def ask_question(qa_chain, question: str, debug: bool = False):
     try:
         # .invoke() runs the full chain:
         #   question → embed → FAISS search → retrieve chunks → fill prompt → LLM → answer
-        result = qa_chain.invoke({"query": question})
+        result = qa_chain.invoke({"input": question})
 
         # The result dict has:
-        #   result["result"]            → the LLM's answer string
-        #   result["source_documents"]  → list of Document objects used as context
-        answer = result["result"]
-        source_docs = result.get("source_documents", [])
+        #   result["answer"]   → the LLM's answer string
+        #   result["context"]  → list of Document objects used as context
+        answer = result["answer"]
+        source_docs = result.get("context", [])
 
         print(f"💡 Answer:\n{answer}")
 

@@ -10,7 +10,7 @@ all three modalities.  The metadata carries the table_id and csv_path so
 callers can retrieve the exact CSV data when needed.
 """
 
-from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
 from langchain.schema import Document
 

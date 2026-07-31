@@ -1,69 +1,76 @@
 """
 src/agent.py
 ------------
-Wires together the tools and LLM into a LangChain ReAct agent.
+Wires together the tools and LLM into a LangChain tool-calling agent.
 
-WHAT IS THE REACT LOOP?
+WHAT IS THE AGENT LOOP?
 ------------------------
-ReAct (Reason + Act) is a prompting strategy where the LLM alternates between:
+This agent uses the model's native tool-calling ability (the same mechanism
+behind OpenAI "function calling"): on each turn the LLM either emits one or
+more tool calls or a final answer. The loop looks like:
 
-  Thought     – the model reasons about what to do next
-  Action      – the model picks a tool and writes an input for it
-  Observation – the tool runs and its output is appended to the prompt
-  … repeat until …
-  Final Answer – the model decides it has enough information
+  1. The LLM sees the conversation so far and the list of available tools.
+  2. It either calls a tool (with structured, typed arguments) or answers.
+  3. If it called a tool, AgentExecutor runs it and appends the result as a
+     "tool" message, then loops back to step 1.
+  4. Once the LLM responds without any tool calls, that's the final answer.
 
 Example:
-  Thought : I need to find papers about transformers. I'll search.
-  Action  : search_papers
-  Action Input: transformer self-attention mechanism
-  Observation : [Result 1] Paper: "Attention Is All You Need" …
-  Thought : I found a relevant paper. Now I'll summarize it.
-  Action  : summarize_paper
-  Action Input: Attention Is All You Need
-  Observation : Title: Attention Is All You Need …
-  Final Answer: The paper "Attention Is All You Need" introduced …
+  LLM: [tool call] search_papers("transformer self-attention mechanism")
+  Tool result: [Result 1] Paper: "Attention Is All You Need" ...
+  LLM: [tool call] summarize_paper("Attention Is All You Need")
+  Tool result: Title: Attention Is All You Need ...
+  LLM: "The paper 'Attention Is All You Need' introduced ..." (final answer)
+
+This is the modern replacement for the older text-based ReAct pattern
+(Thought/Action/Observation), which relied on the LLM writing free-text that
+LangChain then had to parse. Native tool calling is more reliable because the
+model returns structured arguments directly instead of text that must be
+parsed and can be malformed.
 
 HOW THE AGENT SEES THE TOOLS
 ------------------------------
-The agent receives a text-formatted list of tool names and descriptions in its
-system prompt.  It never sees function signatures or source code.  This is why
+Each tool's name, description, and argument schema are sent to the LLM as
+part of the tool-calling API request. The agent never sees function
+signatures or source code — only what the tool object exposes. This is why
 precise tool descriptions are critical: they are the agent's entire API docs.
 
-WHY verbose=True IS IMPORTANT FOR LEARNING
--------------------------------------------
-With verbose=True LangChain prints every Thought / Action / Observation to
-stdout.  You can watch the agent's reasoning unfold in real time.  This is
-invaluable for understanding why the agent chose a particular tool, and for
-debugging when it makes the wrong choice.
+THE INPUT/OUTPUT CONTRACT
+--------------------------
+  Input  - a plain string (the search query).
+  Output - a plain string that the agent reads as a tool result.
+
+LangChain enforces this contract: whatever your func returns is converted to
+str and appended to the conversation as the tool's result message.
+
+WHY TOOL DESCRIPTIONS MUST BE PRECISE
+---------------------------------------
+The agent is stateless — it has no memory of tool internals. If the
+description says "search papers" without clarifying the expected input format,
+the agent might pass a JSON object or a question instead of a keyword query,
+producing poor results. Explicit examples in the description (like "Input: a
+search query string") dramatically improve reliability.
 
 THE DIFFERENCE BETWEEN AN AGENT AND A SIMPLE LLM CALL
 --------------------------------------------------------
-A simple LLM call is a single prompt → single response.  The LLM cannot fetch
-new information mid-response.  An agent can:
+A simple LLM call is a single prompt → single response. The LLM cannot fetch
+new information mid-response. An agent can:
   - Decide which tool to call based on intermediate results
   - Retry with a different query if the first search returns nothing
   - Chain multiple tool calls (search → summarize → compare)
   - Stop early if the first observation already answers the question
-
-WHAT "ZERO SHOT" MEANS
-------------------------
-ZERO_SHOT_REACT_DESCRIPTION means the agent needs zero examples (shots) in its
-prompt.  It figures out when and how to use each tool purely from the tool
-description.  This keeps the prompt short and avoids the need to curate
-few-shot examples for every new tool.
 """
 
-from langchain.agents import AgentExecutor, AgentType, initialize_agent
+from langchain.agents import AgentExecutor, create_tool_calling_agent
 from langchain_community.vectorstores import FAISS
+from langchain_core.prompts import ChatPromptTemplate
 
 from src.tools.compare_tool import create_compare_tool
 from src.tools.search_tool import create_search_tool
 from src.tools.summary_tool import create_summary_tool
 
 # System prompt injected as the agent's persona and behavioural guidelines.
-# The prefix is prepended to the auto-generated ReAct prompt that lists tools.
-_AGENT_PREFIX = """You are an AI research assistant. You have access to a collection of research papers.
+_AGENT_SYSTEM_PROMPT = """You are an AI research assistant. You have access to a collection of research papers.
 Use the available tools to answer questions about the research literature.
 Always cite your sources by mentioning which paper a piece of information comes from.
 Think step by step about which tools to use."""
@@ -83,12 +90,12 @@ def create_research_agent(
     paper_metadata : list[PaperMetadata]
         List of parsed paper metadata objects.
     llm :
-        Any LangChain chat model (e.g., ChatOpenAI).
+        Any LangChain chat model that supports tool calling (e.g., ChatOpenAI).
 
     Returns
     -------
     AgentExecutor
-        The runnable agent.  Call agent.run(query) to use it.
+        The runnable agent. Call agent.invoke({"input": query}) to use it.
     """
     # Build a title → metadata dict for the summary and compare tools
     paper_metadata_dict = {pm.title: pm for pm in paper_metadata}
@@ -100,20 +107,29 @@ def create_research_agent(
 
     tools = [search_tool, summary_tool, compare_tool]
 
-    # initialize_agent wraps the LLM + tools in a ReAct prompt loop.
-    # ZERO_SHOT_REACT_DESCRIPTION: no few-shot examples, tool selection driven
-    # entirely by the description strings we provided above.
-    agent = initialize_agent(
+    # The prompt needs three things: a system message (persona + instructions),
+    # a slot for the user's input, and a slot for the agent's own scratchpad
+    # (the running history of tool calls + results within this turn).
+    prompt = ChatPromptTemplate.from_messages([
+        ("system", _AGENT_SYSTEM_PROMPT),
+        ("human", "{input}"),
+        ("placeholder", "{agent_scratchpad}"),
+    ])
+
+    # create_tool_calling_agent binds the tools to the LLM via its native
+    # function/tool-calling API — no text parsing of Thought/Action lines.
+    agent = create_tool_calling_agent(llm, tools, prompt)
+
+    executor = AgentExecutor(
+        agent=agent,
         tools=tools,
-        llm=llm,
-        agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
-        verbose=True,           # print Thought/Action/Observation to stdout
+        verbose=True,                # print each tool call/result to stdout
         handle_parsing_errors=True,  # recover gracefully from malformed tool calls
-        agent_kwargs={"prefix": _AGENT_PREFIX},
-        max_iterations=8,       # safety cap to prevent infinite loops
+        max_iterations=8,            # safety cap to prevent infinite loops
+        return_intermediate_steps=True,  # expose which tools were called + their results
     )
 
-    return agent
+    return executor
 
 
 def run_agent(query: str, agent: AgentExecutor) -> str:
@@ -135,7 +151,7 @@ def run_agent(query: str, agent: AgentExecutor) -> str:
     print(f"Query: {query}")
     print(f"{'='*60}\n")
 
-    result = agent.run(query)
+    result = agent.invoke({"input": query})["output"]
 
     print(f"\n{'='*60}")
     print("Final Answer:")

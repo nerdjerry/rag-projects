@@ -4,26 +4,23 @@ src/agent.py
 Assembles the LangChain agent executor that ties together the LLM, all tools,
 and optional conversation memory.
 
-THE ReAct LOOP (Reason + Act):
+THE AGENT LOOP:
     Every time the agent receives a question it goes through repeated cycles:
-      1. REASON  — "What do I need to answer this? Which tool should I call?"
-      2. ACT     — Calls a tool with a specific input string.
-      3. OBSERVE — Reads the tool's output.
-      4. REPEAT  — Reasons again with the new information; stops when confident.
+      1. REASON  — the LLM decides what it needs and which tool (if any) to call,
+                    using OpenAI's native function/tool-calling API.
+      2. ACT     — the chosen tool runs with the structured arguments the LLM gave.
+      3. OBSERVE — the tool's output is appended to the conversation.
+      4. REPEAT  — the LLM reasons again with the new information; stops once it
+                    replies without requesting another tool call.
 
     This is fundamentally different from standard RAG which does a single
     FAISS search every time regardless of the question type.
 
-AGENT TYPES:
-    • OPENAI_FUNCTIONS (default when using GPT-3.5 / GPT-4):
-        Uses OpenAI's native function-calling API.  The LLM is trained to emit
-        structured JSON for function calls, so tool invocation is very reliable.
-        Requires an OpenAI model that supports function calling.
-
-    • ZERO_SHOT_REACT_DESCRIPTION (fallback):
-        Works with ANY LLM (Llama, Mistral, Claude, etc.).
-        The LLM reasons in plain text using a "Thought/Action/Observation" format.
-        Less reliable for tool selection but model-agnostic.
+    This project builds the agent with create_tool_calling_agent, which relies
+    on the model's native tool-calling support (OpenAI, Anthropic, and most
+    current chat models implement this). It replaces the older text-based
+    ReAct pattern (Thought/Action/Observation strings that LangChain had to
+    parse), which was less reliable and is deprecated in current LangChain.
 
 MEMORY:
     ConversationBufferWindowMemory(k=5) keeps the last 5 exchanges in context.
@@ -33,16 +30,16 @@ MEMORY:
     Disable memory (--no-memory) for stateless single-query use cases.
 
 VERBOSE MODE:
-    verbose=True is essential for learning: you see every Thought → Action →
-    Observation cycle printed to stdout.  In production set verbose=False.
+    verbose=True is essential for learning: you see every tool call and its
+    result printed to stdout. In production set verbose=False.
 """
 
 from typing import List, Optional
 
-from langchain.agents import AgentExecutor, initialize_agent, AgentType
+from langchain.agents import AgentExecutor, create_tool_calling_agent
 from langchain.memory import ConversationBufferWindowMemory
-from langchain.schema import SystemMessage
-from langchain.tools import Tool
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_core.tools import Tool
 
 
 # System prompt injected before every conversation.
@@ -70,7 +67,8 @@ def create_agent(
 
     Args:
         tools:   List of LangChain Tool objects from tool_registry.
-        llm:     An instantiated LangChain LLM (e.g. ChatOpenAI).
+        llm:     An instantiated LangChain chat model that supports tool
+                 calling (e.g. ChatOpenAI).
         memory:  If True, adds a sliding-window conversation memory (k=5).
         verbose: If True, prints the full reasoning trace to stdout.
 
@@ -86,41 +84,40 @@ def create_agent(
             k=5,
             memory_key="chat_history",
             return_messages=True,
+            # AgentExecutor's output dict has both "output" and (because of
+            # return_intermediate_steps below) "intermediate_steps"; without
+            # this, memory has to guess which key to store and warns about it.
+            output_key="output",
         )
 
-    # --- Determine the best agent type ---
-    # OPENAI_FUNCTIONS is more reliable for tool selection because it uses
-    # OpenAI's native function-calling format instead of text-based reasoning.
-    # We detect whether we're talking to an OpenAI chat model by checking the
-    # class name — this avoids a hard dependency on langchain_openai at this level.
-    llm_class = type(llm).__name__
-    is_openai_chat = "ChatOpenAI" in llm_class or "AzureChatOpenAI" in llm_class
+    # The prompt needs: a system message (persona + instructions), a slot for
+    # prior turns (only used if memory is enabled), the user's input, and a
+    # slot for the agent's own scratchpad (its tool calls + results this turn).
+    prompt = ChatPromptTemplate.from_messages([
+        ("system", _SYSTEM_PROMPT),
+        MessagesPlaceholder("chat_history", optional=True),
+        ("human", "{input}"),
+        MessagesPlaceholder("agent_scratchpad"),
+    ])
 
-    if is_openai_chat:
-        agent_type = AgentType.OPENAI_FUNCTIONS
-        # Inject the system message through agent_kwargs for OPENAI_FUNCTIONS agents.
-        agent_kwargs = {
-            "system_message": SystemMessage(content=_SYSTEM_PROMPT),
-        }
-        if mem:
-            agent_kwargs["extra_prompt_messages"] = []  # memory messages prepended automatically
-    else:
-        # ZERO_SHOT_REACT_DESCRIPTION works with any LLM via plain-text reasoning.
-        agent_type = AgentType.ZERO_SHOT_REACT_DESCRIPTION
-        agent_kwargs = {}
+    # create_tool_calling_agent binds the tools to the LLM via its native
+    # tool-calling API — no text parsing of Thought/Action lines.
+    agent = create_tool_calling_agent(llm, tools, prompt)
 
-    agent_executor = initialize_agent(
+    agent_executor = AgentExecutor(
+        agent=agent,
         tools=tools,
-        llm=llm,
-        agent=agent_type,
         memory=mem,
-        agent_kwargs=agent_kwargs,
         verbose=verbose,
         # handle_parsing_errors=True prevents the agent from crashing when the
         # LLM produces a malformed tool call; it retries with an error message.
         handle_parsing_errors=True,
         # max_iterations caps runaway loops — agent stops after N tool calls.
         max_iterations=8,
+        # Without this, the executor's output dict never contains
+        # "intermediate_steps", so callers can never see which tools were
+        # actually used (see response_formatter.extract_tools_from_steps).
+        return_intermediate_steps=True,
     )
 
     return agent_executor

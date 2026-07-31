@@ -23,8 +23,9 @@ Why source citation is critical in legal Q&A:
     clause can result in a breach of contract, lawsuit, or financial loss.
 """
 
-from langchain.chains import RetrievalQA
-from langchain.prompts import PromptTemplate
+from langchain.chains import create_retrieval_chain
+from langchain.chains.combine_documents import create_stuff_documents_chain
+from langchain_core.prompts import ChatPromptTemplate
 
 
 # ---------------------------------------------------------------------------
@@ -45,23 +46,20 @@ Important: This is for informational purposes only, not legal advice.
 Context from contract:
 {context}
 
-Question: {question}
+Question: {input}
 
 Answer (include section references):"""
 
-_QA_PROMPT = PromptTemplate(
-    template=_LEGAL_QA_TEMPLATE,
-    input_variables=["context", "question"],
-)
+_QA_PROMPT = ChatPromptTemplate.from_template(_LEGAL_QA_TEMPLATE)
 
 
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
 
-def build_qa_chain(retriever, llm) -> RetrievalQA:
+def build_qa_chain(retriever, llm):
     """
-    Construct a RetrievalQA chain grounded in the indexed contract.
+    Construct a retrieval chain grounded in the indexed contract.
 
     Parameters
     ----------
@@ -70,20 +68,16 @@ def build_qa_chain(retriever, llm) -> RetrievalQA:
 
     Returns
     -------
-    RetrievalQA chain ready to accept questions via .invoke() or .run()
+    A runnable retrieval chain — call .invoke({"input": question}) to get
+    a dict with keys "input", "context", "answer".
 
-    The chain uses "stuff" document combination strategy — it concatenates
+    The chain uses a "stuff" document combination strategy — it concatenates
     retrieved chunks into a single context block. For very long contracts
     "map_reduce" or "refine" strategies may be preferable, but "stuff" is
     the most reliable for faithfully citing specific text.
     """
-    qa_chain = RetrievalQA.from_chain_type(
-        llm=llm,
-        chain_type="stuff",
-        retriever=retriever,
-        return_source_documents=True,  # lets callers show which chunks were used
-        chain_type_kwargs={"prompt": _QA_PROMPT},
-    )
+    combine_docs_chain = create_stuff_documents_chain(llm, _QA_PROMPT)
+    qa_chain = create_retrieval_chain(retriever, combine_docs_chain)
     return qa_chain
 
 
@@ -93,8 +87,8 @@ def ask_question(question: str, qa_chain) -> str:
 
     Parameters
     ----------
-    question : str         — the user's question (e.g. "What are my termination rights?")
-    qa_chain : RetrievalQA — built by build_qa_chain()
+    question : str — the user's question (e.g. "What are my termination rights?")
+    qa_chain       — retrieval chain built by build_qa_chain()
 
     Returns
     -------
@@ -104,13 +98,13 @@ def ask_question(question: str, qa_chain) -> str:
     were returned they are appended as a "Sources" footer so users can quickly
     locate the referenced passage in the original document.
     """
-    result = qa_chain.invoke({"query": question})
+    result = qa_chain.invoke({"input": question})
 
-    answer = result.get("result", "No answer returned.")
+    answer = result.get("answer", "No answer returned.")
 
     # Append source chunk references if available — helps users locate the
     # exact passage that was used to generate the answer.
-    source_docs = result.get("source_documents", [])
+    source_docs = result.get("context", [])
     if source_docs:
         answer += "\n\n─── Sources (retrieved chunks) ───"
         for i, doc in enumerate(source_docs, start=1):

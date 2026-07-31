@@ -11,7 +11,7 @@ making non-text assets semantically searchable without specialised multimodal
 embedding models.
 """
 
-from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
 from langchain.schema import Document
 

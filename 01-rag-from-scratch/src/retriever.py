@@ -47,7 +47,7 @@ def get_retriever(vector_store, k: int = 3):
 
     A LangChain "retriever" is a standardized interface that wraps the vector store
     and exposes a simple .invoke(query) method. This makes it easy to plug into
-    LangChain chains (like RetrievalQA in generator.py).
+    LangChain chains (like the retrieval chain in generator.py).
 
     Args:
         vector_store:   A FAISS vector store (from vector_store.py).

@@ -49,7 +49,7 @@ Common conflict patterns this module targets:
 import json
 import re
 
-from langchain.schema import HumanMessage
+from langchain_core.messages import HumanMessage
 
 
 # ---------------------------------------------------------------------------

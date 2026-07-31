@@ -62,7 +62,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
         "--vision-model",
         default=None,
         dest="vision_model",
-        help="OpenAI vision model for image captioning (default: gpt-4-vision-preview).",
+        help="OpenAI vision model for image captioning (default: gpt-4o-mini).",
     )
     parser.add_argument(
         "--skip-images",
@@ -129,7 +129,7 @@ def main() -> None:
 
     # ── Resolve model names ───────────────────────────────────────────────────
     text_model = args.model or os.getenv("OPENAI_MODEL", "gpt-4")
-    vision_model = args.vision_model or os.getenv("VISION_MODEL", "gpt-4-vision-preview")
+    vision_model = args.vision_model or os.getenv("VISION_MODEL", "gpt-4o-mini")
     images_dir = os.getenv("IMAGES_OUTPUT_DIR", "data/extracted/images")
     tables_dir = os.getenv("TABLES_OUTPUT_DIR", "data/extracted/tables")
 

@@ -24,7 +24,7 @@ import os
 import re
 from pathlib import Path
 
-from langchain.schema import HumanMessage
+from langchain_core.messages import HumanMessage
 
 
 # ---------------------------------------------------------------------------

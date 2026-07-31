@@ -2,15 +2,16 @@
 #
 # STEP 6 OF THE RAG PIPELINE: GENERATING THE ANSWER WITH AN LLM
 #
-# WHAT DOES RetrievalQA DO?
-# --------------------------
-# RetrievalQA is a LangChain "chain" that combines two things:
+# WHAT DOES create_retrieval_chain DO?
+# --------------------------------------
+# create_retrieval_chain is LangChain's current (LCEL) way to combine two things:
 #   1. A retriever (which fetches relevant chunks from FAISS)
-#   2. An LLM (which reads those chunks and generates an answer)
+#   2. A "combine docs" chain (an LLM that reads those chunks and generates an answer)
 #
-# It handles the "stuffing" step: it takes the retrieved Document objects,
-# extracts their page_content, concatenates them into a {context} block,
-# and injects that into our prompt template before calling the LLM.
+# The combine docs chain (built with create_stuff_documents_chain) handles the
+# "stuffing" step: it takes the retrieved Document objects, extracts their
+# page_content, concatenates them into a {context} block, and injects that
+# into our prompt template before calling the LLM.
 #
 # WHY THE "ONLY USE CONTEXT" INSTRUCTION PREVENTS HALLUCINATION:
 # ---------------------------------------------------------------
@@ -37,13 +38,15 @@
 # With debug=True, you can print this full prompt to see exactly what the LLM receives.
 
 from langchain_openai import ChatOpenAI
-from langchain.chains import RetrievalQA
-from langchain.prompts import PromptTemplate
+from langchain.chains import create_retrieval_chain
+from langchain.chains.combine_documents import create_stuff_documents_chain
+from langchain_core.prompts import ChatPromptTemplate
 
 
 # The prompt template instructs the LLM to stay grounded in the provided context.
 # {context} will be replaced by the retrieved chunks (as a single text block).
-# {question} will be replaced by the user's question.
+# {input} will be replaced by the user's question — create_retrieval_chain always
+# reads the incoming question from an "input" key, so the template must match.
 RAG_PROMPT_TEMPLATE = """You are a helpful assistant. Answer the question based ONLY on the following context.
 If the answer is not in the context, say "I don't know based on the provided documents."
 Do not use your general knowledge.
@@ -51,7 +54,7 @@ Do not use your general knowledge.
 Context:
 {context}
 
-Question: {question}
+Question: {input}
 
 Answer:"""
 
@@ -62,7 +65,7 @@ def build_qa_chain(
     debug: bool = False,
 ):
     """
-    Build a RetrievalQA chain that combines document retrieval with LLM generation.
+    Build a retrieval chain that combines document retrieval with LLM generation.
 
     This is the final assembly step of the RAG pipeline:
         User question
@@ -81,13 +84,13 @@ def build_qa_chain(
                             Useful for understanding what the LLM actually receives.
 
     Returns:
-        RetrievalQA: A runnable chain. Call chain.invoke({"query": "your question"})
-                     to get an answer dict with keys "query", "result", "source_documents".
+        A runnable retrieval chain. Call chain.invoke({"input": "your question"})
+        to get an answer dict with keys "input", "context", "answer".
 
     Example:
         chain = build_qa_chain(retriever, model_name="gpt-3.5-turbo", debug=True)
-        result = chain.invoke({"query": "What is the refund policy?"})
-        print(result["result"])
+        result = chain.invoke({"input": "What is the refund policy?"})
+        print(result["answer"])
     """
 
     print(f"\n🤖 Building QA chain with model: '{model_name}'")
@@ -103,14 +106,14 @@ def build_qa_chain(
         #
         # The model_name format is "ollama/<model>" e.g. "ollama/llama3"
         import os
-        from langchain_community.llms import Ollama
+        from langchain_ollama import OllamaLLM
 
         # Extract the model tag after the "ollama/" prefix
         ollama_model = model_name.split("/", 1)[1]
         base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 
         print(f"   Using local Ollama model '{ollama_model}' at {base_url}")
-        llm = Ollama(model=ollama_model, base_url=base_url)
+        llm = OllamaLLM(model=ollama_model, base_url=base_url)
 
     else:
         # OpenAI models (gpt-3.5-turbo, gpt-4, gpt-4o, etc.)
@@ -128,10 +131,7 @@ def build_qa_chain(
     # -------------------------------------------------------------------------
     # BUILD THE PROMPT TEMPLATE
     # -------------------------------------------------------------------------
-    prompt = PromptTemplate(
-        template=RAG_PROMPT_TEMPLATE,
-        input_variables=["context", "question"],  # placeholders to fill at runtime
-    )
+    prompt = ChatPromptTemplate.from_template(RAG_PROMPT_TEMPLATE)
 
     # If debug mode is on, show the template so learners can see the structure
     if debug:
@@ -141,27 +141,18 @@ def build_qa_chain(
         print("-" * 60)
 
     # -------------------------------------------------------------------------
-    # ASSEMBLE THE RetrievalQA CHAIN
+    # ASSEMBLE THE RETRIEVAL CHAIN
     # -------------------------------------------------------------------------
-    # chain_type="stuff" means: take all retrieved chunks, "stuff" them all into
-    # the context at once. This works well for small k values (k=3 to k=5).
+    # create_stuff_documents_chain "stuffs" all retrieved chunks into the {context}
+    # placeholder at once and sends them to the LLM. This works well for small k
+    # values (k=3 to k=5); for many chunks you'd want a map-reduce/refine strategy
+    # instead, but "stuff" is the simplest and most effective for most use cases.
     #
-    # Other chain_type options:
-    #   "map_reduce"   — summarize each chunk separately, then combine (handles many chunks)
-    #   "refine"       — iteratively refine the answer chunk by chunk (slower but thorough)
-    #   "map_rerank"   — score each chunk separately and pick the best answer
-    #
-    # For most use cases with k<=5, "stuff" is the simplest and most effective.
-    qa_chain = RetrievalQA.from_chain_type(
-        llm=llm,
-        chain_type="stuff",
-        retriever=retriever,
-        return_source_documents=True,  # include source docs in the result dict
-        chain_type_kwargs={
-            "prompt": prompt,
-            "verbose": debug,  # if debug=True, LangChain will print internal chain steps
-        },
-    )
+    # create_retrieval_chain wires the retriever and the combine-docs chain together:
+    # given {"input": question}, it retrieves chunks, puts them in "context", runs
+    # the combine-docs chain, and returns {"input", "context", "answer"}.
+    combine_docs_chain = create_stuff_documents_chain(llm, prompt)
+    qa_chain = create_retrieval_chain(retriever, combine_docs_chain)
 
     print(f"✅ QA chain ready")
     return qa_chain
