@@ -19,10 +19,14 @@ Most GenAI tutorials show you a hello-world demo and call it a day. These projec
 
 | Requirement | Notes |
 |-------------|-------|
-| Python 3.10+ | `python --version` to check |
-| OpenAI API key | Or run Ollama locally for free |
+| Python 3.10+ | `python --version` to check. Project 4 uses `X \| None` type syntax, which is a hard requirement, not just a suggestion. |
+| OpenAI API key | Required for all 5 projects. Get one at [platform.openai.com/api-keys](https://platform.openai.com/api-keys). Project 1 can run key-free via Ollama instead. |
 | Git | For cloning the repo |
-| 8 GB RAM minimum | For running local embedding models |
+| 8 GB RAM minimum | For running local embedding models (`sentence-transformers` downloads ~80 MB on first run) |
+
+> 💰 **Cost note:** Every project uses free, local embeddings (`sentence-transformers` + FAISS) — you only pay OpenAI for the LLM calls. A full run through any single project typically costs a few cents on `gpt-4o-mini`/`gpt-3.5-turbo`. Projects 4 and 5 have their own cost breakdowns in their READMEs since they make more (or pricier) calls.
+
+> 📂 **No sample documents ship with this repo.** Every project's `data/` folder is intentionally empty (just a `.gitkeep`) so you bring your own PDFs/contracts/papers. Each project's README tells you exactly where to drop files and, in Project 1, how to build a quick synthetic test file to sanity-check retrieval before using real documents.
 
 ---
 
@@ -67,8 +71,8 @@ Project 5: Agentic RAG + Real-Time
 
 ```bash
 # 1. Clone the repo
-git clone https://github.com/your-org/genai-beginner-projects.git
-cd genai-beginner-projects
+git clone https://github.com/techwithprateek/agenticai-projects.git
+cd agenticai-projects
 
 # 2. Pick a project to start with
 cd 01-rag-from-scratch
@@ -85,11 +89,18 @@ pip install -r requirements.txt
 cp .env.example .env
 # Edit .env and add your API keys
 
-# 6. Run the project
+# 6. Confirm it's wired up correctly (no API key needed for --help)
 python main.py --help
+
+# 7. Add at least one document, then run for real — see "Add your documents"
+#    in that project's own README for exactly where files go and what
+#    formats are supported.
+python main.py
 ```
 
-> **Tip:** Each project has its own `venv` and `requirements.txt`. You don't need to install everything at once.
+> **Tip:** Each project has its own `venv` and `requirements.txt`. You don't need to install everything at once — set one project up, confirm it works end to end, then move to the next.
+
+> **Verifying your install worked:** `python main.py --help` should print the full argument list with no errors or warnings about missing packages. If it does, your virtual environment and dependencies are correct — any errors after that point are about API keys or missing documents, not a broken install.
 
 ---
 

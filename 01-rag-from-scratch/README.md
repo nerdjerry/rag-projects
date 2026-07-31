@@ -74,8 +74,20 @@ YOUR DOCUMENTS (PDF / TXT / DOCX)
 | Embeddings        | `sentence-transformers` (HuggingFace)   | Convert text → vectors (free, local)     |
 | Vector database   | `faiss-cpu`                             | Fast similarity search over embeddings   |
 | LLM               | OpenAI GPT-3.5/4 or local Ollama        | Generate answers from retrieved context  |
-| Orchestration     | `langchain` RetrievalQA chain           | Tie retrieval + generation together      |
+| Orchestration     | `langchain` `create_retrieval_chain` (LCEL) | Tie retrieval + generation together  |
 | Env management    | `python-dotenv`                         | Load API keys from `.env` file           |
+
+---
+
+## Prerequisites
+
+| Requirement | Notes |
+|---|---|
+| Python 3.10+ | `python --version` to check |
+| OpenAI API key | **Or** skip it entirely and use Ollama — see [Using Ollama](#using-ollama-no-api-key-needed) below |
+| ~200 MB free disk | `sentence-transformers` model (~80 MB) + FAISS index files |
+
+**First-run downloads:** the embedding model (`all-MiniLM-L6-v2`, ~80 MB) downloads once from HuggingFace Hub and is cached locally — every run after the first is fast and fully offline for embedding.
 
 ---
 
@@ -113,10 +125,19 @@ OPENAI_API_KEY=sk-...your-key-here...
 
 ### 4. Add your documents
 
-Drop any `.pdf`, `.txt`, or `.docx` files into:
+`data/sample_docs/` ships **empty** (just a `.gitkeep`) — you need to add your own files before running. Drop any `.pdf`, `.txt`, or `.docx` files into:
 
 ```
 data/sample_docs/
+```
+
+Don't have a document handy? Create a throwaway one to confirm everything works:
+
+```bash
+cat > data/sample_docs/test.txt << 'EOF'
+The Zorbax Protocol was established in 2019 by Dr. Eleanor Voss.
+The protocol requires three phases: initialization, calibration, and review.
+EOF
 ```
 
 The more documents you add, the more the system can answer. Start with a few text files to test.

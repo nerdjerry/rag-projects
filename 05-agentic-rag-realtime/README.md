@@ -29,7 +29,7 @@ User Question
 ┌─────────────┐
 │  LLM Agent  │  ← reads tool descriptions to decide what to call
 └──────┬──────┘
-       │  ReAct Loop: Reason → Act → Observe → Repeat
+       │  Tool-calling loop: LLM calls a tool → reads result → repeats or answers
        │
   ┌────┴────────────────────────────────────────┐
   │                  Tool Registry              │
@@ -62,35 +62,32 @@ The agent's LLM reads every tool's `name` and `description` string before respon
 **Question:** *"What is AAPL's current price and how does it compare to our internal forecast?"*
 
 ```
-Step 1 — REASON:
-  "This question needs current stock data AND internal documents.
-   I should call get_stock_data first, then search_knowledge_base."
+Step 1 — LLM decides it needs live price data first:
+  Tool call: get_stock_data("AAPL")
+  Result:    "Stock: AAPL | Price: $182.50 | ..."
 
-Step 2 — ACT: get_stock_data("AAPL")
-Step 3 — OBSERVE: "Stock: AAPL | Price: $182.50 | ..."
+Step 2 — LLM now has the price, decides it needs the internal forecast:
+  Tool call: search_knowledge_base("AAPL valuation forecast")
+  Result:    "Found in knowledge base: 1. Q3 forecast values AAPL at..."
 
-Step 4 — REASON:
-  "Now I have the live price. I need the internal forecast from the KB."
-
-Step 5 — ACT: search_knowledge_base("AAPL valuation forecast")
-Step 6 — OBSERVE: "Found in knowledge base: 1. Q3 forecast values AAPL at..."
-
-Step 7 — REASON:
-  "I have both pieces of information. I can now compose a full answer."
-
-Step 8 — FINAL ANSWER (no more tool calls needed)
+Step 3 — LLM has both pieces of information and responds with no further
+          tool calls — that response is the final answer.
 ```
 
-The key insight: **the tool description IS the routing logic**. A clear description like *"Use this for questions about internal policies"* routes the agent correctly without any if/else code.
+The key insight: **the tool description IS the routing logic**. A clear description like *"Use this for questions about internal policies"* routes the agent correctly without any if/else code — the LLM reads each tool's name, description, and argument schema and decides which (if any) to call.
 
 ---
 
 ## Setup
 
+**Prerequisites:** Python 3.10+ and an OpenAI API key (required — every other API key below is optional and the corresponding tool falls back to a mock response without one).
+
 ### 1. Clone and install
 
 ```bash
 cd 05-agentic-rag-realtime
+python -m venv venv
+source venv/bin/activate        # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
@@ -261,16 +258,24 @@ python main.py --model gpt-3.5-turbo --interactive
 
 ### Viewing the reasoning trace
 
-The `--verbose` flag (on by default) prints every Thought → Action → Observation cycle. This is the best way to debug unexpected answers:
+The `--verbose` flag (on by default) prints every tool call and its result as the agent makes them. This is the best way to debug unexpected answers:
 
 ```
-Thought: I need current stock data for AAPL.
-Action: get_stock_data
-Action Input: AAPL
-Observation: Stock: AAPL | Price: $182.50 | ...
-Thought: I now have the price. Let me check the knowledge base for the internal valuation.
-...
+> Entering new AgentExecutor chain...
+
+Invoking: `get_stock_data` with `AAPL`
+
+Stock: AAPL | Price: $182.50 | ...
+
+Invoking: `search_knowledge_base` with `AAPL valuation forecast`
+
+Found in knowledge base: 1. Q3 forecast values AAPL at...
+AAPL is currently trading at $182.50, compared to our internal Q3 forecast of...
+
+> Finished chain.
 ```
+
+After the run, the answer box's **"Tools Used"** footer (from `response_formatter.py`) lists every tool the agent actually called, deduplicated — a quick way to confirm the agent used the data source you expected without reading the full trace.
 
 ---
 

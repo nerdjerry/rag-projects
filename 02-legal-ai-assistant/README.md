@@ -64,6 +64,16 @@ A Retrieval-Augmented Generation (RAG) pipeline that helps you understand contra
 
 ---
 
+## Prerequisites
+
+| Requirement | Notes |
+|---|---|
+| Python 3.10+ | `python --version` to check |
+| OpenAI API key | Required — this project has no key-free/local-model path |
+| A contract PDF or DOCX | `data/sample_contracts/` ships **empty** (just a `.gitkeep`); bring your own file or use any sample service agreement / NDA you have on hand |
+
+---
+
 ## Setup
 
 ### 1. Clone / navigate to the project
@@ -100,7 +110,18 @@ OPENAI_MODEL=gpt-4          # or gpt-3.5-turbo for lower cost
 
 ### 5. Add a contract file
 
-Place a PDF or DOCX contract in `data/sample_contracts/` or any other path.
+`data/sample_contracts/` ships empty — place a PDF or DOCX contract there (or point `--file` at any other path). Don't have one handy? Create a minimal test DOCX in Python:
+
+```bash
+python -c "
+from docx import Document
+d = Document()
+d.add_paragraph('SERVICE AGREEMENT between Acme Corp and Beta LLC.')
+d.add_paragraph('Section 1. Termination. Either party may terminate with 30 days written notice.')
+d.add_paragraph('Section 2. Liability. Total liability is capped at fees paid in the preceding 12 months.')
+d.save('data/sample_contracts/test_contract.docx')
+"
+```
 
 ---
 

@@ -74,6 +74,16 @@ PDF Document
 
 ---
 
+## Prerequisites
+
+| Requirement | Notes |
+|---|---|
+| **Python 3.10+ (hard requirement)** | `multi_retriever.py` uses `X \| None` union-type syntax that only parses on 3.10+ |
+| OpenAI API key | Required — used for text generation, vision captioning, and table description |
+| A PDF with mixed content | `data/sample_docs/` ships **empty**. For a good demo, use a PDF that has actual charts/diagrams and at least one data table — a plain text-only PDF won't show off what this project does differently from Project 1 |
+
+---
+
 ## Setup
 
 ### 1. Clone and enter the project
@@ -99,6 +109,8 @@ cp .env.example .env
 ```
 
 ### 5. Add a PDF document
+
+`data/sample_docs/` ships empty — copy in a real PDF before running:
 ```bash
 cp /path/to/your/document.pdf data/sample_docs/
 ```

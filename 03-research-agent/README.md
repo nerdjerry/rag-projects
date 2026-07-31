@@ -24,26 +24,35 @@ Think of the difference between:
 
 In simple RAG, the pipeline is fixed: retrieve then answer.  In an agent, the LLM itself decides the pipeline at runtime.
 
-## The ReAct Loop Explained
+## The Agent Loop Explained
 
-**ReAct = Reason + Act**.  The agent alternates between thinking and doing:
+The agent uses the LLM's native **tool calling** (the same mechanism behind OpenAI function calling) rather than parsing free-text "Thought/Action" lines. On each turn the model either calls a tool with structured arguments or responds with a final answer:
 
 ```
-Thought : I need to find papers about attention mechanisms.
-Action  : search_papers
-Input   : attention mechanism self-attention
-Observation: [Result 1] Paper: "Attention Is All You Need" …
+LLM decides: call search_papers("attention mechanism self-attention")
+Tool result: [Result 1] Paper: "Attention Is All You Need" …
 
-Thought : I found the relevant paper. Now I'll get its full summary.
-Action  : summarize_paper
-Input   : Attention Is All You Need
-Observation: Title: Attention Is All You Need, Authors: Vaswani et al. …
+LLM decides: call summarize_paper("Attention Is All You Need")
+Tool result: Title: Attention Is All You Need, Authors: Vaswani et al. …
 
-Thought : I have enough to answer the question.
-Final Answer: The paper "Attention Is All You Need" introduced …
+LLM responds with no further tool calls — that's the final answer:
+"The paper 'Attention Is All You Need' introduced …"
 ```
 
-Each **Observation** is the tool's output, appended to the agent's context.  The agent re-reads the growing context at each step to decide what to do next.
+With `verbose=True` (the default), LangChain prints each tool invocation and its result to stdout as it happens, e.g.:
+
+```
+> Entering new AgentExecutor chain...
+
+Invoking: `search_papers` with `attention mechanism self-attention`
+
+[Result 1] Paper: "Attention Is All You Need" …
+The paper "Attention Is All You Need" introduced …
+
+> Finished chain.
+```
+
+Each tool result is appended to the conversation, so the agent can reference earlier results when deciding its next step or composing the final answer.
 
 ## Architecture
 
@@ -55,7 +64,7 @@ Each **Observation** is the tool's output, appended to the agent's context.  The
                        │
           ┌────────────▼────────────┐
           │    Research Agent       │  ← agent.py
-          │  (ReAct loop + LLM)     │
+          │ (tool-calling loop+LLM) │
           └──┬──────────┬───────────┘
              │          │
     ┌─────────▼──┐  ┌───▼────────────┐  ┌─────────────────┐
@@ -79,6 +88,14 @@ Each **Observation** is the tool's output, appended to the agent's context.  The
   paper_metadata → gap_analyzer.py → LLM synthesis → report_generator.py → .md file
 ```
 
+## Prerequisites
+
+| Requirement | Notes |
+|---|---|
+| Python 3.10+ | `python --version` to check |
+| OpenAI API key | Required — this project has no key-free/local-model path |
+| A few research papers as PDFs | `data/papers/` ships **empty**; any PDF with selectable (non-scanned) text works, e.g. papers downloaded from [arXiv](https://arxiv.org) |
+
 ## Setup
 
 ```bash
@@ -96,7 +113,7 @@ pip install -r requirements.txt
 cp .env.example .env
 # Edit .env and add your OPENAI_API_KEY
 
-# 5. Add research papers
+# 5. Add research papers — data/papers/ ships empty, so this step is required
 # Copy your .pdf files into data/papers/
 ```
 
@@ -179,7 +196,7 @@ The gap analysis report has six sections:
 
 1. Create `src/tools/my_tool.py` with a `create_my_tool(…) -> Tool` function.
 2. Import and instantiate it in `src/agent.py` inside `create_research_agent`.
-3. Add it to the `tools` list passed to `initialize_agent`.
+3. Add it to the `tools` list passed to `create_tool_calling_agent` and `AgentExecutor`.
 
 The agent will automatically start using the new tool based on its description — no other changes needed.
 
